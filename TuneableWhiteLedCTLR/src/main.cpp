@@ -100,6 +100,7 @@ void IRAM_ATTR onEncoderAPinChange()
   if (digitalRead(ENC_A_PIN) == HIGH) {
     if (digitalRead(ENC_B_PIN) == LOW) {
       encoderPos += step;
+      buttonState = true;
     } else {
       encoderPos -= step;
     }
