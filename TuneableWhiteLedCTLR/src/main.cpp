@@ -29,7 +29,7 @@ PubSubClient client(espClient);
 const char* applicationUUID = "123456789";
 const char* default_mqtt_server = "192.168.2.201";
 const char* TOPIC = "Light/Keuken";
-const char* Version = "V0.0.1";
+const char* Version = "V0.0.2";
 
 // MQTT stuff end
 
@@ -66,14 +66,19 @@ unsigned long currentMillis;
 // Rotary Encoder State
 volatile int encoderPos = 0;
 volatile int encoderUpdate = 1;
+volatile int encoderMin = 0;
+volatile int encoderMax = 255;
+volatile int encoderLowRangeStep = 1;
+volatile int encoderHighRangeStep = 5;
+volatile int encoderRangeChange = 32;
 
 // Button State
-volatile bool buttonState = false;
+volatile bool buttonState = true;
 
 // PWM State
 int pwmValue = 0;
 
-const byte iotResetPin = D3;
+const byte iotResetPin = D2;
 const byte Led_pin   = D4; // using the built in LED
 
 // PWM Pin Definition
@@ -90,46 +95,76 @@ const byte Led_pin   = D4; // using the built in LED
 // Interrupt Service Routine for Rotary Encoder A Pin and Button Pin
 void IRAM_ATTR onEncoderAPinChange()
 {
+  int step = encoderLowRangeStep;
+  if ( encoderPos >= encoderRangeChange ) step = encoderHighRangeStep;
   if (digitalRead(ENC_A_PIN) == HIGH) {
     if (digitalRead(ENC_B_PIN) == LOW) {
-      encoderPos++;
+      encoderPos += step;
     } else {
-      encoderPos--;
+      encoderPos -= step;
     }
-  } else {
-    if (digitalRead(ENC_B_PIN) == LOW) {
-      encoderPos--;
-    } else {
-      encoderPos++;
-    }
+  }
+  //  else {
+  //   if (digitalRead(ENC_B_PIN) == LOW) {
+  //     encoderPos--;
+  //   } else {
+  //     encoderPos++;
+  //   }
+  // }
+
+  if (digitalRead(BUTTON_PIN) == LOW) {
+    if (buttonState == true) 
+      buttonState = false;
+    else
+      buttonState = true;
   }
 
 
-  if ( encoderPos < 0 ) encoderPos = 0;
-  if ( encoderPos > 100 ) encoderPos = 100;
+  if ( encoderPos < encoderMin ) encoderPos = encoderMin;
+  if ( encoderPos > encoderMax ) encoderPos = encoderMax;
   encoderUpdate++;
 }
 
+int WarmStart = 0;
+int WarmStop = 192;
+int CoolStart = 128;
+int CoolStop = 255;
+int pwmCool = 0;
+int pwmWarm = 0;
+
 // Function to Set PWM Signal Based on Encoder Position and Button State
 void setPWM() {
+  pwmCool = 0;
+  pwmWarm = 0;
   pwmValue = 0;
   if (buttonState) {
-    pwmValue = map(encoderPos, 0, 100, 0, 255);
+    // pwmValue = map(encoderPos, 0, 100, 0, 255);
+    if (encoderPos >= WarmStart) {
+      pwmWarm = map(encoderPos, WarmStart, WarmStop, encoderMin, encoderMax);
+      if ( pwmWarm > 255 ) pwmWarm = 255;
+      if ( pwmWarm < 0 ) pwmWarm = 0;
+    }
+    if (encoderPos >= CoolStart) {
+      pwmCool = map(encoderPos, CoolStart, CoolStop, encoderMin, encoderMax);
+      if ( pwmCool > 255 ) pwmCool = 255;
+      if ( pwmCool < 0 ) pwmCool = 0;
+    } 
   } 
 
-  
-    analogWrite(PWM_PIN_COOL, pwmValue);
-    analogWrite(PWM_PIN_WARM, pwmValue);
-
-
+    analogWrite(PWM_PIN_COOL, pwmCool);
+    analogWrite(PWM_PIN_WARM, pwmWarm);
 }
 
 void Load_defaults() {
+  user_wifi.period = 1000; 
   strcpy(user_wifi.mqtt_server, default_mqtt_server);
 }
 
 void show_settings() {
   char value[32];
+  snprintf(value, 32, "%ld", user_wifi.period );
+  transmit_mqtt("settings","period",value);
+
   snprintf(value, 32, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3] );
   transmit_mqtt("settings","ip",value);
   transmit_mqtt("settings","version",Version);
@@ -213,7 +248,7 @@ void setup()
   pinMode(ENC_B_PIN, INPUT_PULLUP);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(ENC_A_PIN), onEncoderAPinChange, CHANGE);
-  // attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), onEncoderAPinChange, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), onEncoderAPinChange, CHANGE);
 
   // Initialize PWM Pin
   pinMode(PWM_PIN_COOL, OUTPUT);
@@ -425,21 +460,29 @@ void loop()
  
   client.loop(); // mqtt loop
   // Blinking led.
-  if (digitalRead(BUTTON_PIN) == HIGH) {
-    buttonState = true;
-  } else {
-    buttonState = false;
-  }
-
+ 
   setPWM();
-      if ( encoderUpdate > 0 ) {
-  Serial.println(encoderPos);
-        encoderUpdate = 0;
-      }
+
+  if ( encoderUpdate > 0 ) {
+    // Serial.println(encoderPos);
+    // Serial.println(startMillis);
+    // Serial.println(currentMillis);
+    // Serial.println(user_wifi.period);
+
+    encoderUpdate = 0;
+  }
 
   currentMillis = millis();                  // get the current "time" (actually the number of milliseconds since the program started)
   if (((currentMillis - startMillis) >= user_wifi.period) && (configuration.state == wifi_ready) )// test whether the period has elapsed
   {
+    Serial.print("Cool: ");
+    Serial.println(pwmCool);
+    Serial.print("Warm: ");
+    Serial.println(pwmWarm);
+    // Serial.println(encoderPos);
+    // Serial.println(buttonState);
+
+
     // digitalWrite(Heater_1, !digitalRead(Heater_1));  //if so, change the state of the LED.  Uses a neat trick to change the state
     if (configuration.state == wifi_ap_mode)
       ShowClients();
