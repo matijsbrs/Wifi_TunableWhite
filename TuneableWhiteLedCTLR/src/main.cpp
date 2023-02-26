@@ -151,8 +151,8 @@ void setPWM() {
     } 
   } 
 
-    analogWrite(PWM_PIN_COOL, pwmCool);
-    analogWrite(PWM_PIN_WARM, pwmWarm);
+    // analogWrite(PWM_PIN_COOL, pwmCool);
+    // analogWrite(PWM_PIN_WARM, pwmWarm);
 }
 
 void Load_defaults() {
@@ -439,7 +439,9 @@ void ShowClients()
 
 
 byte loper = 0x01;
-
+uint32 pwmStartMillis = 0;
+int pwmCoolWrk = 0;
+int pwmWarmWrk = 0;
 void loop()
 {
   switch (configuration.state)
@@ -464,7 +466,7 @@ void loop()
   setPWM();
 
   if ( encoderUpdate > 0 ) {
-    // Serial.println(encoderPos);
+    Serial.println(encoderPos);
     // Serial.println(startMillis);
     // Serial.println(currentMillis);
     // Serial.println(user_wifi.period);
@@ -473,11 +475,27 @@ void loop()
   }
 
   currentMillis = millis();                  // get the current "time" (actually the number of milliseconds since the program started)
+  if ( (currentMillis - pwmStartMillis) >= 100 ) {
+    pwmStartMillis = currentMillis + 100;
+    
+    
+    if ( pwmCool > pwmCoolWrk ) pwmCoolWrk++;
+    if ( pwmWarm > pwmWarmWrk ) pwmWarmWrk++;
+    if ( pwmCool < pwmCoolWrk ) pwmCoolWrk--;
+    if ( pwmWarm < pwmWarmWrk ) pwmWarmWrk--;
+
+    analogWrite(PWM_PIN_COOL, pwmCoolWrk);
+    analogWrite(PWM_PIN_WARM, pwmWarmWrk);
+  }
   if (((currentMillis - startMillis) >= user_wifi.period) && (configuration.state == wifi_ready) )// test whether the period has elapsed
   {
     Serial.print("Cool: ");
+    Serial.print(pwmCoolWrk);
+    Serial.print(" ");
     Serial.println(pwmCool);
     Serial.print("Warm: ");
+    Serial.print(pwmWarmWrk);
+    Serial.print(" ");
     Serial.println(pwmWarm);
     // Serial.println(encoderPos);
     // Serial.println(buttonState);
