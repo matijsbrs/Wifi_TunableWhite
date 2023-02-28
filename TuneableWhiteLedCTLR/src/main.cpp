@@ -71,6 +71,7 @@ volatile int encoderMax = 255;
 volatile int encoderLowRangeStep = 1;
 volatile int encoderHighRangeStep = 5;
 volatile int encoderRangeChange = 32;
+volatile unsigned long lastEncoderTime = 0;
 
 // Button State
 volatile bool buttonState = true;
@@ -97,14 +98,16 @@ void IRAM_ATTR onEncoderAPinChange()
 {
   int step = encoderLowRangeStep;
   if ( encoderPos >= encoderRangeChange ) step = encoderHighRangeStep;
-  if (digitalRead(ENC_A_PIN) == HIGH) {
-    if (digitalRead(ENC_B_PIN) == LOW) {
-      encoderPos += step;
-      buttonState = true;
-    } else {
-      encoderPos -= step;
-    }
+
+  unsigned long currentTime = micros();
+
+  // Debounce Rotary Encoder Pins
+  if ((currentTime - lastEncoderTime) < 100) {
+    return;
   }
+
+  lastEncoderTime = currentTime;
+
   //  else {
   //   if (digitalRead(ENC_B_PIN) == LOW) {
   //     encoderPos--;
@@ -118,6 +121,15 @@ void IRAM_ATTR onEncoderAPinChange()
       buttonState = false;
     else
       buttonState = true;
+  } else {
+    if (digitalRead(ENC_A_PIN) == HIGH) {
+      if (digitalRead(ENC_B_PIN) == LOW) {
+        encoderPos += step;
+        buttonState = true;
+      } else {
+        encoderPos -= step;
+      }
+    }
   }
 
 
@@ -173,7 +185,7 @@ void show_settings() {
 
 void Validate_settings() {
     if (user_wifi.period < 100 ) user_wifi.period = 100;
-    if (user_wifi.period > 10000 ) user_wifi.period = 10000;
+    if (user_wifi.period > 60000 ) user_wifi.period = 60000;
 }
 
 void ApMode()
@@ -440,7 +452,7 @@ void ShowClients()
 
 
 byte loper = 0x01;
-uint32 pwmStartMillis = 0;
+unsigned long pwmStartMillis = 0;
 int pwmCoolWrk = 0;
 int pwmWarmWrk = 0;
 void loop()
@@ -485,19 +497,31 @@ void loop()
     if ( pwmCool < pwmCoolWrk ) pwmCoolWrk--;
     if ( pwmWarm < pwmWarmWrk ) pwmWarmWrk--;
 
+        char value[32];
+    snprintf(value, 32, "%d", encoderPos );
+    transmit_mqtt("RotaryEncoder","encoderPos",value);
+    snprintf(value, 32, "%d", pwmCool );
+    transmit_mqtt("Cool","pwm",value);
+    snprintf(value, 32, "%d", pwmCoolWrk );
+    transmit_mqtt("TrueCool","pwm",value);    
+    snprintf(value, 32, "%d", pwmWarm );
+    transmit_mqtt("Warm","pwm",value);
+    snprintf(value, 32, "%d", pwmWarmWrk );
+    transmit_mqtt("TrueWarm","pwm",value);
+
     analogWrite(PWM_PIN_COOL, pwmCoolWrk);
     analogWrite(PWM_PIN_WARM, pwmWarmWrk);
   }
   if (((currentMillis - startMillis) >= user_wifi.period) && (configuration.state == wifi_ready) )// test whether the period has elapsed
   {
-    Serial.print("Cool: ");
-    Serial.print(pwmCoolWrk);
-    Serial.print(" ");
-    Serial.println(pwmCool);
-    Serial.print("Warm: ");
-    Serial.print(pwmWarmWrk);
-    Serial.print(" ");
-    Serial.println(pwmWarm);
+    // Serial.print("Cool: ");
+    // Serial.print(pwmCoolWrk);
+    // Serial.print(" ");
+    // Serial.println(pwmCool);
+    // Serial.print("Warm: ");
+    // Serial.print(pwmWarmWrk);
+    // Serial.print(" ");
+    // Serial.println(pwmWarm);
     // Serial.println(encoderPos);
     // Serial.println(buttonState);
 
