@@ -29,7 +29,7 @@ PubSubClient client(espClient);
 const char* applicationUUID = "123456789";
 const char* default_mqtt_server = "192.168.2.201";
 const char* TOPIC = "Light/Keuken";
-const char* Version = "V0.0.4";
+const char* Version = "V0.0.5";
 
 // MQTT stuff end
 
@@ -124,10 +124,10 @@ void IRAM_ATTR onEncoderAPinChange()
   } else {
     if (digitalRead(ENC_A_PIN) == HIGH) {
       if (digitalRead(ENC_B_PIN) == LOW) {
-        encoderPos += step;
+        encoderPos -= step;
         buttonState = true;
       } else {
-        encoderPos -= step;
+        encoderPos += step;
       }
     }
   }
@@ -212,7 +212,7 @@ void mqtt_callback(char* topic, byte* message, unsigned int length) {
   String messageTemp;
   
   // char mytopic[32];
-  // snprintf(mytopic, 32, "sensor-%08X/set", ESP.getChipId());
+  // snprintf(mytopic, 32, "light-%08X/set", ESP.getChipId());
 
   for (unsigned int i = 0; i < length; i++) {
     // Serial.print((char)message[i]);
@@ -271,7 +271,7 @@ void setup()
   EEPROM.begin(sizeof(struct settings));
   Load_defaults();
 
-  sprintf(ssid, "sensor-%08X\n", ESP.getChipId());
+  sprintf(ssid, "light-%08X\n", ESP.getChipId());
   sprintf(password, ACCESSPOINT_PASS);
 
   if (!digitalRead(iotResetPin))
@@ -296,7 +296,7 @@ void setup()
     byte tries = 0;
     while (WiFi.status() != WL_CONNECTED)
     {
-      delay(1000);
+      delay(2000);
       Serial.println("Retry connecting");
       if (tries++ > 15)
       {
@@ -373,14 +373,14 @@ int connect_mqtt() {
 
   // // Create a random client ID
   // String clientId = "ESP8266Client-";
-  // sprintf(ssid, "sensor-%08X\n", ESP.getChipId());
+  // sprintf(ssid, "light-%08X\n", ESP.getChipId());
   // clientId += String(random(0xffff), HEX);
 
   // Attempt to connect
   if (client.connect(ssid)) {
     Serial.println("connected");
     char topic[32];
-    snprintf(topic, 32, "sensor-%08X/cmd", ESP.getChipId());
+    snprintf(topic, 32, "light-%08X/cmd", ESP.getChipId());
     Serial.println(topic);
     client.subscribe(topic);
     return 1;
@@ -394,7 +394,7 @@ int connect_mqtt() {
 void transmit_mqtt(const char * extTopic, const char * Field, const char * payload) {
   if (connect_mqtt()) {
     char topic[75];
-    snprintf(topic, 75, "sensor-%08X/%s/%s", ESP.getChipId(), extTopic,Field);
+    snprintf(topic, 75, "light-%08X/%s/%s", ESP.getChipId(), extTopic,Field);
     // Serial.println(topic);
     client.publish(topic, payload);
   } else {
@@ -404,7 +404,7 @@ void transmit_mqtt(const char * extTopic, const char * Field, const char * paylo
 
 void transmit_mqtt_influx(const char * Field, float value) {
   char payload[75];
-  snprintf(payload, 75, "climatic,host=sensor-%08X %s=%f",ESP.getChipId(),Field, value);
+  snprintf(payload, 75, "climatic,host=light-%08X %s=%f",ESP.getChipId(),Field, value);
   transmit_mqtt(TOPIC, "state", payload);
 }
 
@@ -524,7 +524,9 @@ void loop()
     // Serial.println(pwmWarm);
     // Serial.println(encoderPos);
     // Serial.println(buttonState);
-
+        char value[32];
+    snprintf(value, 32, "%d", encoderPos );
+    transmit_mqtt("RotaryEncoder","encoderPos",value);
 
     // digitalWrite(Heater_1, !digitalRead(Heater_1));  //if so, change the state of the LED.  Uses a neat trick to change the state
     if (configuration.state == wifi_ap_mode)
