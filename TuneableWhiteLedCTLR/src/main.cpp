@@ -29,7 +29,7 @@ PubSubClient client(espClient);
 const char* applicationUUID = "123456789";
 const char* default_mqtt_server = "192.168.2.201";
 const char* TOPIC = "Light/Keuken";
-const char* Version = "V0.0.2";
+const char* Version = "V0.0.4";
 
 // MQTT stuff end
 
@@ -488,8 +488,8 @@ void loop()
   }
 
   currentMillis = millis();                  // get the current "time" (actually the number of milliseconds since the program started)
-  if ( (currentMillis - pwmStartMillis) >= 100 ) {
-    pwmStartMillis = currentMillis + 100;
+  if ( (currentMillis - pwmStartMillis) >= 10 ) {
+    pwmStartMillis = currentMillis;
     
     
     if ( pwmCool > pwmCoolWrk ) pwmCoolWrk++;
@@ -497,17 +497,17 @@ void loop()
     if ( pwmCool < pwmCoolWrk ) pwmCoolWrk--;
     if ( pwmWarm < pwmWarmWrk ) pwmWarmWrk--;
 
-        char value[32];
-    snprintf(value, 32, "%d", encoderPos );
-    transmit_mqtt("RotaryEncoder","encoderPos",value);
-    snprintf(value, 32, "%d", pwmCool );
-    transmit_mqtt("Cool","pwm",value);
-    snprintf(value, 32, "%d", pwmCoolWrk );
-    transmit_mqtt("TrueCool","pwm",value);    
-    snprintf(value, 32, "%d", pwmWarm );
-    transmit_mqtt("Warm","pwm",value);
-    snprintf(value, 32, "%d", pwmWarmWrk );
-    transmit_mqtt("TrueWarm","pwm",value);
+    //     char value[32];
+    // snprintf(value, 32, "%d", encoderPos );
+    // transmit_mqtt("RotaryEncoder","encoderPos",value);
+    // snprintf(value, 32, "%d", pwmCool );
+    // transmit_mqtt("Cool","pwm",value);
+    // snprintf(value, 32, "%d", pwmCoolWrk );
+    // transmit_mqtt("TrueCool","pwm",value);    
+    // snprintf(value, 32, "%d", pwmWarm );
+    // transmit_mqtt("Warm","pwm",value);
+    // snprintf(value, 32, "%d", pwmWarmWrk );
+    // transmit_mqtt("TrueWarm","pwm",value);
 
     analogWrite(PWM_PIN_COOL, pwmCoolWrk);
     analogWrite(PWM_PIN_WARM, pwmWarmWrk);
