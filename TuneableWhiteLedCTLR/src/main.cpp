@@ -29,7 +29,7 @@ PubSubClient client(espClient);
 const char* applicationUUID = "123456789";
 const char* default_mqtt_server = "192.168.2.201";
 const char* TOPIC = "Light/Keuken";
-const char* Version = "V0.0.5";
+const char* Version = "V0.0.7";
 
 // MQTT stuff end
 
@@ -242,7 +242,24 @@ void mqtt_callback(char* topic, byte* message, unsigned int length) {
   
   } else if (messageTemp == "system=restart" ) {
     ESP.restart();
+  }else if (messageTemp.startsWith("period=") ) {
+    user_wifi.period = messageTemp.substring(7).toInt();\
+    Validate_settings();
+    Serial.printf("period: %ld\n", user_wifi.period);
+  } else if (messageTemp.startsWith("encoderPos=") ) {
+    encoderPos = messageTemp.substring(11).toInt();\
+    Validate_settings();
+    Serial.printf("encoder pos: %d\n",encoderPos );
+  } else if (messageTemp.startsWith("Power=") ) {
+    int button = messageTemp.substring(6).toInt();\
+    if ( button > 0 ) 
+      buttonState = true;
+    else 
+      buttonState = false;
+    Validate_settings();
+    Serial.printf("Power state: %d\n", button);
   }
+ 
 
 
 
@@ -266,6 +283,8 @@ void setup()
   // Initialize PWM Pin
   pinMode(PWM_PIN_COOL, OUTPUT);
   pinMode(PWM_PIN_WARM, OUTPUT);
+  encoderPos = 128; // set default level.
+  setPWM();
 
   configuration.state = booting;
   EEPROM.begin(sizeof(struct settings));
@@ -498,16 +517,8 @@ void loop()
     if ( pwmWarm < pwmWarmWrk ) pwmWarmWrk--;
 
     //     char value[32];
-    // snprintf(value, 32, "%d", encoderPos );
-    // transmit_mqtt("RotaryEncoder","encoderPos",value);
-    // snprintf(value, 32, "%d", pwmCool );
-    // transmit_mqtt("Cool","pwm",value);
-    // snprintf(value, 32, "%d", pwmCoolWrk );
-    // transmit_mqtt("TrueCool","pwm",value);    
-    // snprintf(value, 32, "%d", pwmWarm );
-    // transmit_mqtt("Warm","pwm",value);
-    // snprintf(value, 32, "%d", pwmWarmWrk );
-    // transmit_mqtt("TrueWarm","pwm",value);
+
+
 
     analogWrite(PWM_PIN_COOL, pwmCoolWrk);
     analogWrite(PWM_PIN_WARM, pwmWarmWrk);
@@ -527,6 +538,25 @@ void loop()
         char value[32];
     snprintf(value, 32, "%d", encoderPos );
     transmit_mqtt("RotaryEncoder","encoderPos",value);
+    snprintf(value, 32, "%d", pwmCool );
+    transmit_mqtt("Cool","pwm",value);
+    snprintf(value, 32, "%d", pwmCoolWrk );
+    transmit_mqtt("TrueCool","pwm",value);    
+    snprintf(value, 32, "%d", pwmWarm );
+    transmit_mqtt("Warm","pwm",value);
+    snprintf(value, 32, "%d", pwmWarmWrk );
+    transmit_mqtt("TrueWarm","pwm",value);
+    
+    Serial.print("Cool: ");
+    Serial.print(pwmCoolWrk);
+    Serial.print(" ");
+    Serial.println(pwmCool);
+    Serial.print("Warm: ");
+    Serial.print(pwmWarmWrk);
+    Serial.print(" ");
+    Serial.println(pwmWarm);
+    Serial.println(encoderPos);
+    Serial.println(buttonState);
 
     // digitalWrite(Heater_1, !digitalRead(Heater_1));  //if so, change the state of the LED.  Uses a neat trick to change the state
     if (configuration.state == wifi_ap_mode)
